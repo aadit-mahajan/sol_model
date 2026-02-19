@@ -126,37 +126,25 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
 
     return losses, model
 
-def create_zero_shot_split(data, test_ratio=0.1, val_ratio= 0.1,seed=None):
-    np.random.seed(seed)
+def create_train_test_split(data, test_ratio = 0.1, seed = None):
+    if seed is not None:
+        np.random.seed(None)
+    else:
+        np.random.seed(42)
+
     unique_cations = data['Cation'].unique()
     unique_anions = data['Anion'].unique()
     
     test_cations = np.random.choice(unique_cations, size=int(len(unique_cations)*test_ratio), replace = False)
     test_anions = np.random.choice(unique_anions, size=int(len(unique_anions)*test_ratio), replace=False)
 
-    # remove from dataset
-    unique_cations = unique_cations[~np.isin(unique_cations, test_cations)]
-    unique_anions = unique_anions[~np.isin(unique_anions, test_anions)]
-
-    val_cations = np.random.choice(unique_cations, size=int(len(unique_cations)*val_ratio), replace=False)
-    val_anions = np.random.choice(unique_anions, size=int(len(unique_anions)*val_ratio), replace=False)
-
-    # remove again
-    unique_cations = unique_cations[~np.isin(unique_cations, val_cations)]
-    unique_anions = unique_anions[~np.isin(unique_anions, val_anions)]
-    train_cations = unique_cations
-    train_anions = unique_anions
-
-    train_data = data[data['Cation'].isin(train_cations) & data['Anion'].isin(train_anions)]
+    train_data = data[~data['Cation'].isin(test_cations) & ~data['Anion'].isin(test_anions)]
     test_data = data[data['Cation'].isin(test_cations) & data['Anion'].isin(test_anions)]
-    val_data = data[data['Cation'].isin(val_cations) & data['Anion'].isin(val_anions)]
 
     train_c_features = encode(train_data['Cation_SMILES'].tolist())
     train_a_features = encode(train_data['Anion_SMILES'].tolist())
     test_c_features = encode(test_data['Cation_SMILES'].tolist())
     test_a_features = encode(test_data['Anion_SMILES'].tolist())
-    val_c_features = encode(val_data['Cation_SMILES'].tolist())
-    val_a_features = encode(val_data['Anion_SMILES'].tolist())
 
     X_train = np.hstack((train_c_features, train_a_features))
     y_train = train_data['Capacity'].apply(lambda x: np.log10(np.clip(x, 1e-8, None))).values
@@ -164,18 +152,25 @@ def create_zero_shot_split(data, test_ratio=0.1, val_ratio= 0.1,seed=None):
     X_test = np.hstack((test_c_features, test_a_features))
     y_test = test_data['Capacity'].apply(lambda x: np.log10(np.clip(x, 1e-8, None))).values
 
-    X_val = np.hstack((val_c_features, val_a_features))
-    y_val = val_data['Capacity'].apply(lambda x: np.log10(np.clip(x, 1e-8, None))).values
-    
     train_dataset = TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
     test_dataset = TensorDataset(torch.tensor(X_test, dtype=torch.float32), torch.tensor(y_test, dtype=torch.float32))
-    val_dataset = TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32))
 
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
-    val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
 
-    return train_loader, test_loader, val_loader
+    return train_loader, test_loader
+
+def split_train_val(dataset, val_ratio=0.1, seed=None):
+    """Split a TensorDataset into train/val DataLoaders."""
+    val_size = max(1, int(len(dataset) * val_ratio))
+    train_size = len(dataset) - val_size
+    generator = torch.Generator()
+    if seed is not None:
+        generator.manual_seed(seed)
+    train_subset, val_subset = torch.utils.data.random_split(dataset, [train_size, val_size], generator=generator)
+    train_loader = DataLoader(train_subset, batch_size=64, shuffle=True)
+    val_loader = DataLoader(val_subset, batch_size=64, shuffle=False)
+    return train_loader, val_loader
 
 # Ensemble predictions
 def ensemble_predict(models, X):
@@ -192,15 +187,19 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(losses_dir, exist_ok=True)
     input_dim = 768  # encoder output dim 
-    num_epochs = 10
+    num_epochs = 15
     device = 'cuda:0'
     # Train multiple models with different splits
+    train_loader, test_loader = create_train_test_split(data, test_ratio=0.1, seed=None)
     
+    train_data = train_loader.dataset
+
     models = []
+
     for seed in range(5):
         print('-'*50)
-        train, test, val = create_zero_shot_split(data, seed=seed)
-        print(f"Train size: {len(train.dataset)}, Val size: {len(val.dataset)}, Test size: {len(test.dataset)}")
+        train, val = split_train_val(train_data, val_ratio=0.1, seed=seed)
+        print(f"Train size: {len(train.dataset)}, Val size: {len(val.dataset)}")
         print("training model number ", seed)
         model = SolubilityModel(input_dim, hidden_dim=32)
         criterion = nn.MSELoss()
@@ -219,10 +218,9 @@ def main():
         plt.savefig(os.path.join(losses_dir, f"loss_curve_seed_{seed}.png"))
         plt.close()
 
-    _, test, _ = create_zero_shot_split(data, seed=42)
     # prediction on test set
-    X_test = torch.tensor(test.dataset.tensors[0].numpy(), dtype=torch.float32).to(device)
-    y_test = test.dataset.tensors[1].to(device)
+    X_test = torch.tensor(test_loader.dataset.tensors[0].numpy(), dtype=torch.float32).to(device)
+    y_test = test_loader.dataset.tensors[1].to(device)
     predictions = ensemble_predict(models, X_test)
 
     r2 = r2_score(y_test.cpu().numpy(), predictions)
