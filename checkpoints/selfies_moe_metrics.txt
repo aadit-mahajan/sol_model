@@ -9,21 +9,21 @@ Test size: 96
 
 Per-seed train/val summary
 ------------------------------------------------------------
-Seed 0: best_val_epoch=14, best_val_loss=0.001505, final_train_loss=0.002183, final_val_loss=0.001859
-Seed 1: best_val_epoch=12, best_val_loss=0.001941, final_train_loss=0.001664, final_val_loss=0.002578
-Seed 2: best_val_epoch=15, best_val_loss=0.001944, final_train_loss=0.001596, final_val_loss=0.001944
-Seed 3: best_val_epoch=14, best_val_loss=0.002180, final_train_loss=0.001916, final_val_loss=0.002428
-Seed 4: best_val_epoch=15, best_val_loss=0.001717, final_train_loss=0.001650, final_val_loss=0.001717
+Seed 0: best_val_epoch=15, best_val_loss=0.001483, final_train_loss=0.001823, final_val_loss=0.001483
+Seed 1: best_val_epoch=15, best_val_loss=0.001281, final_train_loss=0.001749, final_val_loss=0.001281
+Seed 2: best_val_epoch=14, best_val_loss=0.002319, final_train_loss=0.001846, final_val_loss=0.002590
+Seed 3: best_val_epoch=15, best_val_loss=0.002309, final_train_loss=0.001749, final_val_loss=0.002309
+Seed 4: best_val_epoch=15, best_val_loss=0.001620, final_train_loss=0.001462, final_val_loss=0.001620
 
 Aggregate train/val across seeds
 ------------------------------------------------------------
-Mean best val loss: 0.001857 +- 0.000229
-Mean final train loss: 0.001802 +- 0.000220
-Mean final val loss: 0.002105 +- 0.000336
+Mean best val loss: 0.001802 +- 0.000431
+Mean final train loss: 0.001726 +- 0.000137
+Mean final val loss: 0.001857 +- 0.000504
 
 Test metrics (ensemble prediction on strict OOD test set)
 ------------------------------------------------------------
-R2: 0.847693
-MSE: 0.103128
-RMSE: 0.321136
-MAE: 0.280317
+R2: 0.850553
+MSE: 0.101192
+RMSE: 0.318107
+MAE: 0.280352

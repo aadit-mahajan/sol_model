@@ -242,7 +242,7 @@ def main():
         train, val = split_train_val(train_data, val_ratio=0.2, seed=seed)
         print(f"Train size: {len(train.dataset)}, Val size: {len(val.dataset)}")
         print("training model number ", seed)
-        model = SolubilityModel(input_dim, hidden_dim=512, num_experts=8)
+        model = SolubilityModel(input_dim, hidden_dim=512, num_experts=9)
         criterion = nn.MSELoss()
 
         optimizer = optim.Adam(model.parameters(), lr=0.0001)
